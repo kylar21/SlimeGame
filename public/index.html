@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Slime Lounge</title>
+<style>
+  :root {
+    --bg: #eef3e8; --panel: #ffffff; --ink: #233023; --muted: #6b7a6b;
+    --line: #cfdcc6; --accent: #4c9a3f; --accent-ink: #ffffff; --input: #f6f9f2;
+    --me: #2f7a25; --sys: #8a7a3a;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131913; --panel: #1c251c; --ink: #e6efe2; --muted: #93a591;
+      --line: #2f3d2f; --accent: #7cc46a; --accent-ink: #10200d; --input: #141c14;
+      --me: #a8e39a; --sys: #d9c77a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131913; --panel: #1c251c; --ink: #e6efe2; --muted: #93a591;
+    --line: #2f3d2f; --accent: #7cc46a; --accent-ink: #10200d; --input: #141c14;
+    --me: #a8e39a; --sys: #d9c77a;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  .app { max-width: 960px; margin: 0 auto; padding: 14px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
+  h1 span { color: var(--accent); }
+  .status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); padding: 5px 11px; border-radius: 999px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #c9a13a; }
+  .dot.live { background: #3fbf5a; }
+  .layout { display: grid; grid-template-columns: minmax(0, 560px) minmax(260px, 1fr); gap: 14px; align-items: start; }
+  .stage { position: relative; width: 100%; aspect-ratio: 1; border: 3px solid var(--line); border-radius: 10px; overflow: hidden; background: #72ba61; }
+  canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; cursor: pointer; }
+  .hint { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+  #chestBtn { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); display: none; box-shadow: 0 2px 10px rgba(0,0,0,.35); white-space: nowrap; z-index: 5; }
+  #powerChestBtn { position: absolute; left: 50%; bottom: 54px; transform: translateX(-50%); display: none; box-shadow: 0 2px 10px rgba(0,0,0,.35); white-space: nowrap; z-index: 5; background: #7a3fd1; color: #fff; }
+  #hatToast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%) translateY(-8px); background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 8px 14px; font-size: 13.5px; font-weight: 700; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; z-index: 6; text-align: center; }
+  #hatToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #powerupBadge { position: absolute; right: 10px; top: 10px; background: var(--panel); border: 2px solid #7a3fd1; color: #7a3fd1; border-radius: 10px; padding: 6px 10px; font-size: 12px; font-weight: 700; display: none; z-index: 6; text-align: center; white-space: nowrap; }
+  .board { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 12px; }
+  .board .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .board .chip .n { color: var(--muted); font-weight: 600; }
+  .chat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; height: 100%; min-height: 300px; }
+  .chat-wrap { position: relative; }
+  .chat-head { padding: 10px 12px; font-weight: 700; font-size: 14px; border-bottom: 1px solid var(--line); }
+  .log { flex: 1; overflow-y: auto; padding: 10px 12px; font-size: 14px; line-height: 1.4; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+  .log .msg { word-break: break-word; }
+  .log .who { font-weight: 700; margin-right: 6px; }
+  .log .msg.self .who { color: var(--me); }
+  .log .sys { color: var(--sys); font-style: italic; font-size: 13px; }
+  .send { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+  .send input { flex: 1; min-width: 0; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--input); color: var(--ink); font: inherit; font-size: 15px; }
+  button { font: inherit; cursor: pointer; }
+  .btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 700; }
+  .btn:active { transform: translateY(1px); }
+  .overlay { position: absolute; inset: 0; background: rgba(15, 30, 15, .62); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .overlay.hidden { display: none; }
+  .card { background: var(--panel); border-radius: 12px; padding: 18px; width: 100%; max-width: 320px; border: 2px solid var(--line); text-align: center; }
+  .card h2 { margin: 0 0 4px; font-size: 20px; }
+  .card p { margin: 0 0 12px; color: var(--muted); font-size: 13.5px; }
+  .card input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--input); color: var(--ink); font: inherit; font-size: 16px; text-align: center; }
+  .swatches { display: flex; gap: 8px; justify-content: center; margin: 14px 0; flex-wrap: wrap; }
+  .sw { width: 34px; height: 34px; border-radius: 50%; border: 3px solid transparent; padding: 0; }
+  .sw.on { border-color: var(--ink); }
+  @media (max-width: 780px) {
+    .layout { grid-template-columns: 1fr; }
+    .chat { height: 280px; }
+  }
+  @media (min-width: 781px) {
+    .chat-wrap { align-self: stretch; }
+    .chat { position: absolute; inset: 0; height: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🟢 Slime <span>Lounge</span></h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Starting…</span></div>
+  </header>
+
+  <div class="board" id="board" style="display:none"></div>
+
+  <div class="layout">
+    <div>
+      <div class="stage">
+        <canvas id="game" width="480" height="480" aria-label="Slime lounge room"></canvas>
+        <div class="overlay" id="overlay">
+          <div class="card">
+            <h2>Join the lounge</h2>
+            <p>Pick a nickname and a slime colour.</p>
+            <input id="nick" maxlength="14" placeholder="Nickname" autocomplete="off">
+            <input id="pw" type="password" placeholder="Lounge password" autocomplete="off" style="display:none;margin-top:8px">
+            <div id="err" style="color:#c0392b;font-size:13px;min-height:16px;margin-top:6px"></div>
+            <div class="swatches" id="swatches"></div>
+            <button class="btn" id="joinBtn">Enter lounge</button>
+          </div>
+        </div>
+        <button class="btn" id="chestBtn">🎁 Open chest</button>
+        <button class="btn" id="powerChestBtn">✨ Open power chest</button>
+        <div id="hatToast"></div>
+        <div id="powerupBadge"></div>
+      </div>
+      <div class="hint">Click the floor (or use WASD / arrow keys) to move. Press Enter to chat. Press F or double-tap to throw fire (2s cooldown) — land two hits on someone and they respawn at the center. Find the chest at the bottom of the lounge for a free random hat, and the glowing chest on the left for a temporary attack power-up — it unlocks every 10 fire hits on the leaderboard. Walk through the doorway on the right to enter the boss chamber: dodge the big slime's fireballs (two hits sends you back to the lounge), land 30 hits on it to defeat it, and grab the magical sword resting behind it — or steal it from whoever's currently holding it.</div>
+    </div>
+
+    <div class="chat-wrap">
+      <div class="chat">
+        <div class="chat-head">Lounge chat</div>
+        <div class="log" id="log"></div>
+        <div class="send">
+          <input id="chatInput" maxlength="120" placeholder="Say something…" autocomplete="off">
+          <button class="btn" id="sendBtn">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- constants ----------
+  var W = 480, T = 48;
+  var BOUNDS = { x0: 40, x1: W - 40, y0: 62, y1: W - 34 };
+  var SPEED = 125;
+  var HUES = [120, 195, 330, 45, 270, 8];
+  var FONT = 'bold 13px "Trebuchet MS", "Segoe UI", sans-serif';
+  var CHEST = { x: 240, y: 414, r: 40 };
+  var POWER_CHEST = { x: 90, y: 240, r: 40 };
+  var FIRE_SPEED = 260, FIRE_LIFE = 900, FIRE_COOLDOWN = 2000;
+  var FIRE_SPREAD = 0.34; // radians between triple-shot pellets; must match the server
+  var POWERUP_EMOJI = { speedy: "💨", big: "💥", triple: "🔱", bouncy: "🪀", rapid: "🔁", pierce: "🎯", haste: "⚡" };
+  // Second room: a bigger boss chamber reachable through a door on the lounge's right wall.
+  // It's drawn in its own, larger coordinate space (BOSS_W) and scaled down to fit the same
+  // on-screen canvas, so it reads as a bigger room without resizing anything in the page.
+  var BOSS_W = 720;
+  var BOSS_SCALE = W / BOSS_W;
+  var BOSS_BOUNDS = { x0: 40, x1: BOSS_W - 40, y0: 62, y1: BOSS_W - 34 }; // must match the server's BOSS_BOUNDS
+  var DOOR_ZONE = { y0: 205, y1: 285 };                       // lounge door; must match the server's DOOR_Y0/Y1_LOUNGE
+  var BOSS_DOOR_ZONE = { y0: 320, y1: 420 };                  // boss door; must match the server's DOOR_Y0/Y1_BOSS
+  var BOSS_POS = { x: 560, y: 370 };                          // must match the server's BOSS_POS
+  var SWORD_CHEST = { x: 630, y: 370 };                       // must match the server's SWORD_CHEST
+  var BOSS_MAX_HP = 30;                                       // must match the server's BOSS_MAX_HP
+  function curBounds() { return myRoom === "boss" ? BOSS_BOUNDS : BOUNDS; }
+  function curScale() { return myRoom === "boss" ? BOSS_SCALE : 1; }
+  // Must match the server's HATS table (ids and rarities).
+  var HATS_META = {
+	dragon:  { name: "Dragon Head",   rarity: "legendary" },
+    straw:   { name: "Straw Hat",     rarity: "common" },
+    acorn:   { name: "Acorn Cap",     rarity: "common" },
+    bandana: { name: "Bandana",       rarity: "common" },
+    flower:  { name: "Flower Crown",  rarity: "uncommon" },
+    wizard:  { name: "Wizard Hat",    rarity: "uncommon" },
+    pirate:  { name: "Pirate Hat",    rarity: "rare" },
+    silver:  { name: "Silver Crown",  rarity: "rare" },
+    halo:    { name: "Halo",          rarity: "epic" },
+    horns:   { name: "Dragon Horns",  rarity: "epic" },
+    golden:  { name: "Golden Crown",  rarity: "legendary" },
+	flamecrown: { name: "Flame Crown",  rarity: "legendary" }
+  };
+  var RARITY_EMOJI = { common: "🟢", uncommon: "🔵", rare: "🟣", epic: "🟠", legendary: "🌟" };
+
+  // ---------- DOM ----------
+  var cv = document.getElementById("game");
+  var ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  var overlay = document.getElementById("overlay");
+  var nickEl = document.getElementById("nick");
+  var swEl = document.getElementById("swatches");
+  var logEl = document.getElementById("log");
+  var chatInput = document.getElementById("chatInput");
+  var dot = document.getElementById("dot");
+  var statusText = document.getElementById("statusText");
+  var boardEl = document.getElementById("board");
+
+  // ---------- state ----------
+  var joined = false;
+  var me = { x: W / 2, y: W / 2 + 70, tx: null, ty: null, name: "", hue: 120, moving: false, hat: null, facing: { x: 0, y: 1 } };
+  var fires = [];
+  var lastFireAt = 0;
+  var keys = {};
+  var bubbles = new Map();     // key -> {text, until}
+  var lastChatAt = 0;
+  var activePowerup = null;    // { id, name, desc, expiresAt } | null
+  var myHits = 0;
+  var myPowerupClaims = 0;
+  var myRoom = "lounge";       // "lounge" | "boss"
+  var swordHolderId = null;    // player id currently holding the magical sword, or null
+  var bossHP = BOSS_MAX_HP;
+  var bossAlive = true;
+
+  // ---------- helpers ----------
+  function clean(s, n) {
+    return String(s).replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, "").replace(/\s+/g, " ").trim().slice(0, n);
+  }
+  function isNum(v) { return typeof v === "number" && isFinite(v); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function hashPhase(s) { var h = 0; for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 628; return h / 100; }
+
+  // ---------- floor (pre-rendered) ----------
+  var floorLounge = (function () {
+    var c = document.createElement("canvas"); c.width = c.height = W;
+    var g = c.getContext("2d");
+    var r, col;
+    for (r = 0; r < 10; r++) for (col = 0; col < 10; col++) {
+      g.fillStyle = (r + col) % 2 ? "#7cc46a" : "#72ba61";
+      g.fillRect(col * T, r * T, T, T);
+    }
+    var s = 11;
+    function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
+    var i, x, y;
+    for (i = 0; i < 90; i++) {
+      x = (rnd() * W) | 0; y = (rnd() * W) | 0;
+      g.fillStyle = "#5aa04d"; g.fillRect(x, y, 3, 6); g.fillRect(x + 3, y + 3, 3, 3); g.fillRect(x - 3, y + 3, 3, 3);
+    }
+    for (i = 0; i < 16; i++) {
+      x = (rnd() * (W - 100) + 50) | 0; y = (rnd() * (W - 120) + 70) | 0;
+      g.fillStyle = i % 2 ? "#fff6a8" : "#ffc2d4";
+      g.fillRect(x, y, 3, 3); g.fillRect(x - 3, y, 3, 3); g.fillRect(x + 3, y, 3, 3); g.fillRect(x, y - 3, 3, 3); g.fillRect(x, y + 3, 3, 3);
+      g.fillStyle = "#e8a020"; g.fillRect(x, y, 3, 3);
+    }
+    // rug
+    var rx = 144, ry = 168, rw = 192, rh = 192;
+    g.fillStyle = "#8f3d47"; g.fillRect(rx, ry, rw, rh);
+    g.fillStyle = "#e6c17a"; g.fillRect(rx + 6, ry + 6, rw - 12, 3); g.fillRect(rx + 6, ry + rh - 9, rw - 12, 3);
+    g.fillRect(rx + 6, ry + 6, 3, rh - 12); g.fillRect(rx + rw - 9, ry + 6, 3, rh - 12);
+    g.fillStyle = "#b5535e"; g.fillRect(rx + 15, ry + 15, rw - 30, rh - 30);
+    g.fillStyle = "#e6c17a";
+    for (i = 0; i < 4; i++) for (var j = 0; j < 4; j++) {
+      var cx = rx + 36 + i * 40, cy = ry + 36 + j * 40;
+      g.fillRect(cx, cy - 6, 3, 3); g.fillRect(cx - 6, cy, 3, 3); g.fillRect(cx + 6, cy, 3, 3); g.fillRect(cx, cy + 6, 3, 3);
+      g.fillRect(cx, cy, 3, 3);
+    }
+    // fence
+    var fw = 22;
+    g.fillStyle = "#8a5a3b";
+    g.fillRect(0, 0, W, fw + 22); g.fillRect(0, W - fw, W, fw); g.fillRect(0, 0, fw, W); g.fillRect(W - fw, 0, fw, W);
+    g.fillStyle = "#a97449";
+    g.fillRect(0, 0, W, 8); g.fillRect(0, W - fw, W, 5); g.fillRect(0, 0, 6, W); g.fillRect(W - 6, 0, 6, W);
+    g.fillStyle = "#6f4529";
+    g.fillRect(fw, fw + 22, W - fw * 2, 4);
+    for (i = 0; i <= 10; i++) {
+      g.fillStyle = "#c08a58"; g.fillRect(i * T - 6, 6, 12, fw + 16);
+      g.fillStyle = "#6f4529"; g.fillRect(i * T - 6, fw + 18, 12, 4);
+    }
+    // sign
+    g.fillStyle = "#5b3a22"; g.fillRect(W / 2 - 62, 18, 124, 30);
+    g.fillStyle = "#f0dcae"; g.fillRect(W / 2 - 58, 22, 116, 22);
+    g.fillStyle = "#4a3320"; g.font = 'bold 14px "Trebuchet MS", sans-serif'; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText("SLIME LOUNGE", W / 2, 34);
+    // hat chest
+    var chx = CHEST.x, chy = CHEST.y;
+    g.fillStyle = "rgba(0,0,0,.22)"; g.beginPath(); g.ellipse(chx, chy + 12, 20, 6, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#5c3a1e"; g.fillRect(chx - 17, chy - 9, 34, 21);
+    g.fillStyle = "#7a4f28"; g.fillRect(chx - 17, chy - 9, 34, 7);
+    g.fillStyle = "#3a2513"; g.fillRect(chx - 17, chy - 3, 34, 3);
+    g.fillStyle = "#c9932f"; g.fillRect(chx - 3, chy - 2, 6, 7); g.fillRect(chx - 17, chy - 9, 34, 2); g.fillRect(chx - 17, chy + 10, 34, 2);
+    g.fillStyle = "#2a1a0c"; g.fillRect(chx - 3, chy, 6, 3);
+    g.strokeStyle = "#1f130a"; g.lineWidth = 2; g.strokeRect(chx - 17, chy - 9, 34, 21);
+    g.font = 'bold 11px "Trebuchet MS", sans-serif'; g.textAlign = "center"; g.fillStyle = "#3a2513";
+    g.fillText("HATS", chx, chy - 14);
+    // power-up chest
+    var pcx = POWER_CHEST.x, pcy = POWER_CHEST.y;
+    g.fillStyle = "rgba(0,0,0,.22)"; g.beginPath(); g.ellipse(pcx, pcy + 12, 20, 6, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#3a1f5c"; g.fillRect(pcx - 17, pcy - 9, 34, 21);
+    g.fillStyle = "#5a35a0"; g.fillRect(pcx - 17, pcy - 9, 34, 7);
+    g.fillStyle = "#241340"; g.fillRect(pcx - 17, pcy - 3, 34, 3);
+    g.fillStyle = "#b98cff"; g.fillRect(pcx - 4, pcy - 5, 8, 8);
+    g.fillStyle = "#7a3fd1"; g.fillRect(pcx - 17, pcy - 9, 34, 2); g.fillRect(pcx - 17, pcy + 10, 34, 2);
+    g.fillStyle = "#241340"; g.fillRect(pcx - 3, pcy, 6, 3);
+    g.strokeStyle = "#1a0f30"; g.lineWidth = 2; g.strokeRect(pcx - 17, pcy - 9, 34, 21);
+    g.font = 'bold 11px "Trebuchet MS", sans-serif'; g.textAlign = "center"; g.fillStyle = "#e6d4ff";
+    g.fillText("POWER", pcx, pcy - 14);
+    // door to the boss room, right wall
+    g.clearRect(W - fw - 4, DOOR_ZONE.y0, fw + 4, DOOR_ZONE.y1 - DOOR_ZONE.y0);
+    g.fillStyle = "rgba(255,90,60,.55)";
+    g.fillRect(W - fw - 4, DOOR_ZONE.y0, fw + 4, DOOR_ZONE.y1 - DOOR_ZONE.y0);
+    g.font = 'bold 11px "Trebuchet MS", sans-serif'; g.textAlign = "center"; g.fillStyle = "#5b1a12";
+    g.fillText("BOSS ROOM →", W - fw - 34, (DOOR_ZONE.y0 + DOOR_ZONE.y1) / 2);
+    return c;
+  })();
+
+  var floorBoss = (function () {
+    var c = document.createElement("canvas"); c.width = c.height = BOSS_W;
+    var g = c.getContext("2d");
+    var r, col, cols = Math.ceil(BOSS_W / T);
+    for (r = 0; r < cols; r++) for (col = 0; col < cols; col++) {
+      g.fillStyle = (r + col) % 2 ? "#3a2436" : "#32202e";
+      g.fillRect(col * T, r * T, T, T);
+    }
+    var s = 97;
+    function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
+    var i, x, y;
+    for (i = 0; i < 150; i++) {
+      x = (rnd() * BOSS_W) | 0; y = (rnd() * BOSS_W) | 0;
+      g.fillStyle = "rgba(0,0,0,.28)"; g.fillRect(x, y, 4, 1); g.fillRect(x + 1, y + 1, 2, 1);
+    }
+    for (i = 0; i < 26; i++) {
+      x = (rnd() * (BOSS_W - 140) + 70) | 0; y = (rnd() * (BOSS_W - 160) + 90) | 0;
+      g.fillStyle = "#ff7a3c"; g.fillRect(x, y, 2, 2);
+    }
+    // walls
+    var fw = 22;
+    g.fillStyle = "#241019";
+    g.fillRect(0, 0, BOSS_W, fw); g.fillRect(0, BOSS_W - fw, BOSS_W, fw); g.fillRect(0, 0, fw, BOSS_W); g.fillRect(BOSS_W - fw, 0, fw, BOSS_W);
+    g.fillStyle = "#3a1a26";
+    g.fillRect(0, 0, BOSS_W, 6); g.fillRect(0, BOSS_W - fw, BOSS_W, 4); g.fillRect(0, 0, 5, BOSS_W); g.fillRect(BOSS_W - 5, 0, 5, BOSS_W);
+    // door back to the lounge, left wall
+    g.clearRect(0, BOSS_DOOR_ZONE.y0, fw + 4, BOSS_DOOR_ZONE.y1 - BOSS_DOOR_ZONE.y0);
+    g.fillStyle = "rgba(255,210,120,.55)";
+    g.fillRect(0, BOSS_DOOR_ZONE.y0, fw + 4, BOSS_DOOR_ZONE.y1 - BOSS_DOOR_ZONE.y0);
+    g.font = 'bold 15px "Trebuchet MS", sans-serif'; g.textAlign = "center"; g.fillStyle = "#ffe9c2";
+    g.fillText("← LOUNGE", fw + 40, (BOSS_DOOR_ZONE.y0 + BOSS_DOOR_ZONE.y1) / 2);
+    // sword chest
+    var scx = SWORD_CHEST.x, scy = SWORD_CHEST.y;
+    g.fillStyle = "rgba(0,0,0,.3)"; g.beginPath(); g.ellipse(scx, scy + 16, 26, 8, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#3a2b12"; g.fillRect(scx - 22, scy - 12, 44, 27);
+    g.fillStyle = "#5c451c"; g.fillRect(scx - 22, scy - 12, 44, 9);
+    g.fillStyle = "#241a0c"; g.fillRect(scx - 22, scy - 4, 44, 4);
+    g.fillStyle = "#f5c518"; g.fillRect(scx - 22, scy - 12, 44, 3); g.fillRect(scx - 22, scy + 12, 44, 3);
+    g.strokeStyle = "#1a1206"; g.lineWidth = 2; g.strokeRect(scx - 22, scy - 12, 44, 27);
+    g.font = 'bold 14px "Trebuchet MS", sans-serif'; g.textAlign = "center"; g.fillStyle = "#f5e6b8";
+    g.fillText("SWORD", scx, scy - 18);
+    return c;
+  })();
+
+  // ---------- slime sprite ----------
+  var SPR = [
+    "....oooo....",
+    "..ooBBBBoo..",
+    ".oBHHBBBBBo.",
+    ".oBHBBBBBBo.",
+    "oBBBBBBBBBBo",
+    "oBBeBBBBeBBo",
+    "oBBeBBBBeBBo",
+    "oBBBBmmBBBBo",
+    "oSBBBBBBBBSo",
+    ".oSSSSSSSSo.",
+    "..oooooooo.."
+  ];
+  var U = 3, SW = 12 * U, SH = SPR.length * U;
+  var palCache = {};
+  function pal(h) {
+    h = Math.round(h);
+    return palCache[h] || (palCache[h] = {
+      o: "hsl(" + h + ",45%,24%)", B: "hsl(" + h + ",70%,64%)", H: "hsl(" + h + ",85%,90%)",
+      S: "hsl(" + h + ",60%,50%)", e: "#1d1d2b", m: "#6b2a3a"
+    });
+  }
+  function drawSlime(a, t) {
+    var P = pal(a.hue);
+    var sc = a.scale || 1;
+    var hop = a.moving ? Math.abs(Math.sin(t * 9 + a.phase)) * 8 : 0;
+    var sq = a.moving ? 1 + Math.cos(t * 9 + a.phase) * 0.07 : 1 + Math.sin(t * 2.4 + a.phase) * 0.035;
+    ctx.fillStyle = "rgba(0,0,0,.24)";
+    ctx.beginPath(); ctx.ellipse(a.x, a.y + 1, (17 - hop * 0.6) * sc, (5 - hop * 0.15) * sc, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.translate(a.x, a.y - hop * sc);
+    ctx.scale(sc / sq, sc * sq);
+    for (var r = 0; r < SPR.length; r++) {
+      var row = SPR[r];
+      for (var c = 0; c < 12; c++) {
+        var ch = row.charAt(c);
+        if (ch === ".") continue;
+        ctx.fillStyle = P[ch];
+        ctx.fillRect(-SW / 2 + c * U, -SH + r * U, U, U);
+      }
+    }
+    ctx.restore();
+    a.topY = a.y - hop * sc - SH * sq * sc;
+  }
+
+  // ---------- hats ----------
+  function drawHat(a, t) {
+    if (!a.hat) return;
+    var cx = a.x, topY = a.topY;
+    function px(nx, ny, w, h, color) { ctx.fillStyle = color; ctx.fillRect(cx + nx * U, topY + ny * U, w * U, h * U); }
+    switch (a.hat) {
+		case "dragon":
+
+  // --- Outline (black silhouette) ---
+		  px(-5, -9, 10, 1, "#000000");       // top outline
+		  px(-5, -8, 1, 7, "#000000");        // left outline
+		  px(4, -8, 1, 7, "#000000");         // right outline
+		  px(-5, -1, 10, 1, "#000000");       // bottom outline
+
+		  // --- Head base (dark charcoal, rounded) ---
+		  px(-4, -8, 8, 6, "#3B3B3B");        // main head
+		  px(-4, -3, 8, 2, "#2C2C2C");        // lower jaw, darker
+		  px(-3, -8, 6, 1, "#4A4A4A");        // top highlight strip
+
+		  // --- Small curling horns (top corners, like Toothless) ---
+		  px(-4, -10, 1, 1, "#000000");       // left horn tip outline
+		  px(-4, -9, 1, 1, "#2C2C2C");        // left horn
+		  px(-5, -9, 1, 1, "#000000");        // left horn curl-back
+
+		  px(3, -10, 1, 1, "#000000");        // right horn tip outline
+		  px(3, -9, 1, 1, "#2C2C2C");         // right horn
+		  px(4, -9, 1, 1, "#000000");         // right horn curl-back
+
+		  // --- Ear fins (side, small triangular flare) ---
+		  px(-6, -5, 1, 2, "#2C2C2C");        // left ear fin
+		  px(-7, -4, 1, 1, "#000000");        // left ear fin edge
+
+		  px(5, -5, 1, 2, "#2C2C2C");         // right ear fin
+		  px(6, -4, 1, 1, "#000000");         // right ear fin edge
+
+		  // --- Eyes (green crescents with white glint) ---
+		  px(-3, -6, 2, 2, "#7ED321");        // left eye green
+		  px(-3, -5, 1, 1, "#000000");        // left eye black notch (crescent shape)
+		  px(-2, -6, 1, 1, "#FFFFFF");        // left eye glint
+
+		  px(1, -6, 2, 2, "#7ED321");         // right eye green
+		  px(2, -5, 1, 1, "#000000");         // right eye black notch (crescent)
+		  px(1, -6, 1, 1, "#FFFFFF");         // right eye glint
+
+		  // --- Snout ridges (small center bumps, Toothless-style) ---
+		  px(-1, -8, 1, 1, "#000000");
+		  px(0, -7, 1, 1, "#000000");
+		  px(-1, -6, 1, 1, "#000000");
+
+		  // --- Mouth (small curved notch) ---
+		  px(-1, -2, 2, 1, "#000000");
+		break;
+
+      case "straw":
+        px(-6, -1, 12, 1, "#e3c26b"); px(-3, -4, 6, 3, "#c9a13a"); px(-3, -2, 6, 1, "#8a5a2b");
+        break;
+      case "acorn":
+        px(-4, -1, 8, 1, "#6b8e4e"); px(-3, -2, 6, 1, "#6b8e4e"); px(-2, -3, 4, 1, "#5a7a40"); px(-1, -4, 2, 1, "#7a5230");
+        break;
+      case "bandana":
+        px(-5, -1, 10, 1, "#c0392b"); px(-4, -2, 3, 1, "#c0392b"); px(1, -2, 3, 1, "#f2f2f2"); px(-1, -3, 2, 1, "#c0392b");
+        break;
+      case "flower":
+        px(-6, -1, 12, 1, "#5a8a3a");
+        px(-5, -2, 1, 1, "#ff9ec4"); px(-2, -2, 1, 1, "#ffe27a"); px(1, -2, 1, 1, "#ff9ec4"); px(4, -2, 1, 1, "#ffe27a");
+        break;
+      case "wizard":
+        px(-4, -1, 8, 1, "#5b2d8e"); px(-3, -2, 6, 1, "#5b2d8e"); px(-2, -3, 4, 1, "#6a3aa0"); px(-1, -4, 2, 1, "#7a49b5");
+        px(0, -5, 1, 1, "#c9a3ff"); px(-2, -3, 1, 1, "#ffe27a");
+        break;
+      case "pirate":
+        px(-6, -1, 12, 1, "#1c1c1c"); px(-5, -2, 10, 1, "#2b2b2b"); px(-1, -2, 2, 1, "#f2f2f2");
+        break;
+      case "silver":
+        px(-5, -1, 10, 1, "#c9d3da"); px(-5, -2, 2, 1, "#c9d3da"); px(-1, -2, 2, 1, "#c9d3da"); px(3, -2, 2, 1, "#c9d3da");
+        px(-1, -2, 1, 1, "#3b82f6");
+        break;
+      case "horns":
+        px(-6, -1, 12, 1, "#3a2513");
+        px(-5, -2, 2, 2, "#8a2020"); px(3, -2, 2, 2, "#8a2020"); px(-5, -4, 1, 2, "#a83030"); px(4, -4, 1, 2, "#a83030");
+        break;
+      case "halo":
+        ctx.save();
+        ctx.shadowColor = "rgba(255,240,150,.9)"; ctx.shadowBlur = 10;
+        ctx.strokeStyle = "#ffe98a"; ctx.lineWidth = U * 0.7;
+        ctx.beginPath(); ctx.ellipse(cx, topY - 5 * U, 5 * U, 1.6 * U, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+        break;
+      case "golden":
+        ctx.save();
+        var pulse = 8 + Math.sin(t * 4 + (a.phase || 0)) * 3;
+        ctx.shadowColor = "rgba(255,205,40,.95)"; ctx.shadowBlur = pulse + 10;
+        px(-5, -1, 10, 1, "#f5c518");
+        px(-5, -2, 2, 1, "#f5c518"); px(-1, -2, 2, 1, "#f5c518"); px(3, -2, 2, 1, "#f5c518");
+        px(-1, -3, 2, 1, "#fff3b0");
+        ctx.restore();
+        break;
+		
+	  case "flamecrown":
+		  // --- Crown glow ---
+		ctx.save();
+		var pulse = 8 + Math.sin(t * 4 + (a.phase || 0)) * 3;
+		ctx.shadowColor = "rgba(255,205,40,.95)";
+		ctx.shadowBlur = pulse + 10;
+
+		// --- Crown base ---
+		px(-5, -1, 10, 1, "#f5c518");
+
+		// --- Crown spikes ---
+		px(-4, -2, 2, 2, "#f5c518");
+		px(-1, -3, 2, 3, "#ffd84a");
+		px(2, -2, 2, 2, "#f5c518");
+
+		// --- Jewel ---
+		px(0, -2, 1, 1, "#fff3b0");
+
+		ctx.restore();
+
+	    // --- Animated color-cycling flames (HSL) ---
+	    const flicker = Math.sin(t * 10 + (a.phase || 0)) * 1.5 + 2;
+	     
+	    // Cycle hue over time (0–360)
+	    const hue = (t * 120 + (a.phase || 0) * 50) % 360;
+	     
+	    // Generate flame colors using HSL
+	    const flameColors = [
+	  	 `hsl(${hue}, 100%, 75%)`,     // bright yellow
+	  	 `hsl(${hue + 40}, 100%, 60%)`, // orange
+	  	 `hsl(${hue + 80}, 100%, 50%)`  // red
+	    ];
+	     
+	    flameColors.forEach((col, i) => {
+	  	px(-1, -3 - flicker - i, 2, 1, col); // center flame
+	  	px(-3, -2 - flicker - i, 1, 1, col); // left flame
+	  	px(3, -2 - flicker - i, 1, 1, col);  // right flame
+	    });
+	     
+	    break;
+    }
+  }
+
+  // ---------- the big bad slime ----------
+  function drawBoss(cx, cy, t) {
+    var bob = Math.sin(t * 1.6) * 4;
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.28)";
+    ctx.beginPath(); ctx.ellipse(cx, cy + 58, 52, 13, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.translate(cx, cy + bob);
+    var flick = Math.sin(t * 3) * 4;
+
+    // icy flame aura
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = "#0d6fd1";
+    ctx.beginPath(); ctx.arc(-32, -6 + flick * 0.3, 44, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(34, -18 - flick * 0.3, 38, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#37c6f0";
+    ctx.beginPath(); ctx.arc(-17, 12, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(23, 14, 26, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#8fe8ff";
+    ctx.beginPath(); ctx.arc(2, -50 + flick * 0.4, 32, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // body
+    ctx.fillStyle = "#1c1030"; rrect(-58, -48, 116, 100, 28); ctx.fill();
+    ctx.fillStyle = "#5a3aa0"; rrect(-51, -43, 102, 88, 24); ctx.fill();
+
+    // horns
+    ctx.fillStyle = "#1c1030";
+    ctx.beginPath(); ctx.moveTo(-33, -33); ctx.lineTo(-50, -60); ctx.lineTo(-19, -37); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(33, -33); ctx.lineTo(50, -60); ctx.lineTo(19, -37); ctx.closePath(); ctx.fill();
+
+    // face
+    ctx.fillStyle = "#8a5fd6"; ctx.beginPath(); ctx.arc(0, 6, 37, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#e07be0"; ctx.beginPath(); ctx.arc(0, 6, 30, 0, Math.PI * 2); ctx.fill();
+
+    // eyes: open while alive, closed once defeated
+    ctx.fillStyle = "#fff2c6";
+    if (bossAlive) {
+      ctx.beginPath(); ctx.arc(-14, 6, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(14, 6, 5.5, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.strokeStyle = "#3a2560"; ctx.lineWidth = 3.5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(-20, 6); ctx.lineTo(-7, 6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(7, 6); ctx.lineTo(20, 6); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ---------- magical sword ----------
+  function drawSwordShape(x, y, s) {
+    ctx.fillStyle = "#e8eef5"; ctx.fillRect(x - 1.5 * s, y - 18 * s, 3 * s, 19 * s);
+    ctx.fillStyle = "#b8c6d6"; ctx.fillRect(x - 3.5 * s, y - 18 * s, 7 * s, 4 * s);
+    ctx.fillStyle = "#8a5a2b"; ctx.fillRect(x - 6 * s, y, 12 * s, 3 * s);
+    ctx.fillStyle = "#5a3a1c"; ctx.fillRect(x - 1.5 * s, y + 3 * s, 3 * s, 5 * s);
+  }
+  function drawSword(a) {
+    var holds = a.self ? (myId && myId === swordHolderId) : (a.key === swordHolderId);
+    if (!holds) return;
+    var cx = a.x + 10, topY = a.topY;
+    var cy = topY + (a.y - topY) * 0.5;
+    ctx.save();
+    ctx.shadowColor = "rgba(255,230,150,.9)"; ctx.shadowBlur = 8;
+    drawSwordShape(cx, cy, 1.4);
+    ctx.restore();
+  }
+  function drawRestingSword(now) {
+    var bob = Math.sin(now / 300) * 3;
+    var x = SWORD_CHEST.x, y = SWORD_CHEST.y - 18 + bob;
+    ctx.save();
+    ctx.shadowColor = "rgba(255,230,150,.95)"; ctx.shadowBlur = 14;
+    drawSwordShape(x, y, 2.1);
+    ctx.restore();
+  }
+  function drawBossHP() {
+    var bw = 220, bh = 14, bx = W / 2 - bw / 2, by = 52;
+    var frac = Math.max(0, Math.min(1, bossHP / BOSS_MAX_HP));
+    ctx.save();
+    ctx.fillStyle = "rgba(20,8,14,.75)"; rrect(bx - 3, by - 3, bw + 6, bh + 6, 5); ctx.fill();
+    ctx.fillStyle = "#3a1420"; rrect(bx, by, bw, bh, 3); ctx.fill();
+    ctx.fillStyle = "#e0304a"; rrect(bx, by, bw * frac, bh, 3); ctx.fill();
+    ctx.strokeStyle = "#150610"; ctx.lineWidth = 2; rrect(bx, by, bw, bh, 3); ctx.stroke();
+    ctx.font = 'bold 11px "Trebuchet MS", sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffe0e6"; ctx.fillText("BIG SLIME  " + bossHP + " / " + BOSS_MAX_HP, W / 2, by + bh / 2 + 1);
+    ctx.restore();
+  }
+
+  // ---------- text drawing ----------
+  function drawName(a) {
+    ctx.font = FONT; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    ctx.lineJoin = "round"; ctx.lineWidth = 4; ctx.strokeStyle = "rgba(20,30,20,.85)";
+    ctx.strokeText(a.name, a.x, a.y + 17);
+    ctx.fillStyle = a.self ? "#fff2a0" : (a.boss ? "#ffb3c0" : "#ffffff");
+    ctx.fillText(a.name, a.x, a.y + 17);
+  }
+  function rrect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+  function wrap(text, maxW) {
+    ctx.font = FONT;
+    var lines = [], cur = "", words = text.split(" ");
+    function push(w) {
+      while (ctx.measureText(w).width > maxW) {
+        var k = w.length;
+        while (k > 1 && ctx.measureText(w.slice(0, k)).width > maxW) k--;
+        lines.push(w.slice(0, k)); w = w.slice(k);
+      }
+      return w;
+    }
+    for (var i = 0; i < words.length; i++) {
+      var trial = cur ? cur + " " + words[i] : words[i];
+      if (ctx.measureText(trial).width <= maxW) { cur = trial; }
+      else { if (cur) lines.push(cur); cur = push(words[i]); }
+    }
+    if (cur) lines.push(cur);
+    return lines.slice(0, 5);
+  }
+  function drawBubble(a, b, now) {
+    var left = b.until - now;
+    var alpha = left < 600 ? Math.max(0, left / 600) : 1;
+    if (alpha <= 0) return;
+    if (!b.lines) b.lines = wrap(b.text, 150);
+    ctx.font = FONT;
+    var lh = 16, pad = 7, i, mw = 0;
+    for (i = 0; i < b.lines.length; i++) mw = Math.max(mw, ctx.measureText(b.lines[i]).width);
+    var bw = mw + pad * 2, bh = b.lines.length * lh + pad * 2 - 2;
+    var bx = clamp(a.x - bw / 2, 4, W - bw - 4);
+    var by = Math.max(4, a.topY - bh - 9);
+    ctx.globalAlpha = alpha;
+    rrect(bx, by, bw, bh, 7); ctx.fillStyle = "#fffdf5"; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = "#3a3a3a"; ctx.stroke();
+    var tx = clamp(a.x, bx + 10, bx + bw - 10);
+    ctx.beginPath(); ctx.moveTo(tx - 5, by + bh - 1); ctx.lineTo(tx, by + bh + 7); ctx.lineTo(tx + 5, by + bh - 1);
+    ctx.fillStyle = "#fffdf5"; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tx - 5, by + bh); ctx.lineTo(tx, by + bh + 7); ctx.lineTo(tx + 5, by + bh);
+    ctx.strokeStyle = "#3a3a3a"; ctx.stroke();
+    ctx.fillStyle = "#222"; ctx.textAlign = "left"; ctx.textBaseline = "top";
+    for (i = 0; i < b.lines.length; i++) ctx.fillText(b.lines[i], bx + pad, by + pad - 1 + i * lh);
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- fire ----------
+  // Elastic reflection of a 1D position bouncing between [lo, hi] forever — used for
+  // Bouncy Flames so every client computes the same trajectory with no extra network traffic.
+  function bouncedPos(p0, v, t, lo, hi) {
+    var range = hi - lo;
+    if (range <= 0) return p0;
+    var period = 2 * range;
+    var raw = (p0 - lo + v * t) % period;
+    if (raw < 0) raw += period;
+    return lo + (raw > range ? period - raw : raw);
+  }
+  function fireXY(f, t) {
+    var vx = f.dx * FIRE_SPEED * (f.speedMult || 1), vy = f.dy * FIRE_SPEED * (f.speedMult || 1);
+    if (f.bounce) return { x: bouncedPos(f.x, vx, t, curBounds().x0, curBounds().x1), y: bouncedPos(f.y, vy, t, curBounds().y0, curBounds().y1) };
+    return { x: f.x + vx * t, y: f.y + vy * t };
+  }
+  function drawFireball(f, x, y, elapsed, scale) {
+    scale = scale || 1;
+    var c1 = f.boss ? "#7a2bd6" : "#ff8a2b", c2 = f.boss ? "#b23cff" : "#ffb23c", c3 = f.boss ? "#e8b8ff" : "#fff1b8";
+    var glow = f.boss ? "rgba(140,40,220,.85)" : "rgba(255,130,20,.85)";
+    var steps = 3, k, te, tp;
+    for (k = steps; k >= 1; k--) {
+      te = elapsed - k * 0.035;
+      if (te < 0) continue;
+      tp = fireXY(f, te);
+      ctx.globalAlpha = 0.28 - k * 0.07;
+      ctx.fillStyle = c1;
+      ctx.beginPath(); ctx.arc(tp.x, tp.y, (4 - k * 0.6) * scale, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.save();
+    ctx.shadowColor = glow; ctx.shadowBlur = 9 * scale;
+    ctx.fillStyle = c2;
+    ctx.beginPath(); ctx.arc(x, y, 5 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = c3;
+    ctx.beginPath(); ctx.arc(x, y, 2 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  function drawSpark(x, y, hd) {
+    var alpha = Math.max(0, 1 - hd / 0.28);
+    var r = 4 + hd * 40;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = "rgba(255,180,60,.9)"; ctx.shadowBlur = 12;
+    ctx.strokeStyle = "#ffcf5c"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+  function stepAndDrawFires(now, actors) {
+    for (var i = fires.length - 1; i >= 0; i--) {
+      var f = fires[i];
+      var elapsed = (now - f.born) / 1000;
+      var life = (f.life || FIRE_LIFE) / 1000;
+      var scale = f.scale || 1;
+      var p = fireXY(f, elapsed), x = p.x, y = p.y;
+
+      var worldMax = myRoom === "boss" ? BOSS_W : W;
+
+      if (!f.pierce) {
+        if (!f.hitAt && elapsed > life) { fires.splice(i, 1); continue; }
+        if (!f.hitAt && !f.bounce && (x < -20 || x > worldMax + 20 || y < -20 || y > worldMax + 20)) { fires.splice(i, 1); continue; }
+        if (!f.hitAt) {
+          var hitR = 15 * scale;
+          for (var j = 0; j < actors.length; j++) {
+            var act = actors[j];
+            if (act.key === f.ownerKey) continue;
+            var hr = hitR + (act.boss ? 34 : 0);
+            if (Math.hypot(act.x - x, act.y - y) < hr) {
+              f.hitAt = now; f.hitX = x; f.hitY = y;
+              if (f.ownerKey === "me" && !f.reported && act.key !== "me") {
+                f.reported = true;
+                if (wsOpen && joinedOnServer) send({ t: "hit", targetId: act.key });
+              } else if (f.ownerKey === "boss" && act.key === "me" && !f.reported) {
+                f.reported = true;
+                if (wsOpen && joinedOnServer) send({ t: "bossHit" });
+              }
+              break;
+            }
+          }
+        }
+        if (f.hitAt) {
+          var hd = (now - f.hitAt) / 1000;
+          if (hd > 0.28) { fires.splice(i, 1); continue; }
+          drawSpark(f.hitX, f.hitY, hd);
+        } else {
+          drawFireball(f, x, y, elapsed, scale);
+        }
+      } else {
+        // Piercing Flames: keeps flying and can hit several different targets before it expires.
+        if (elapsed > life) { fires.splice(i, 1); continue; }
+        if (!f.bounce && (x < -20 || x > worldMax + 20 || y < -20 || y > worldMax + 20)) { fires.splice(i, 1); continue; }
+        var pr = 15 * scale;
+        for (var k = 0; k < actors.length; k++) {
+          var pa = actors[k];
+          if (pa.key === f.ownerKey || f.hitTargets.has(pa.key)) continue;
+          if (Math.hypot(pa.x - x, pa.y - y) < pr) {
+            f.hitTargets.add(pa.key);
+            f.pierceSparks.push({ x: x, y: y, at: now });
+            if (f.ownerKey === "me" && wsOpen && joinedOnServer) send({ t: "hit", targetId: pa.key });
+          }
+        }
+        drawFireball(f, x, y, elapsed, scale);
+        for (var s2 = f.pierceSparks.length - 1; s2 >= 0; s2--) {
+          var ps = f.pierceSparks[s2];
+          var pshd = (now - ps.at) / 1000;
+          if (pshd > 0.28) { f.pierceSparks.splice(s2, 1); continue; }
+          drawSpark(ps.x, ps.y, pshd);
+        }
+      }
+    }
+  }
+  function currentFireStats() {
+    var pu = activePowerup && activePowerup.id;
+    return {
+      speedMult: pu === "speedy" ? 1.9 : 1,
+      sizeMult: (me.hat === "dragon" ? 1.7 : 1) * (pu === "big" ? 1.5 : 1),
+      bounce: pu === "bouncy",
+      life: pu === "bouncy" ? 4200 : (pu === "pierce" ? 1300 : FIRE_LIFE),
+      pierce: pu === "pierce",
+      shots: pu === "triple" ? 3 : 1,
+      cooldown: pu === "rapid" ? Math.round(FIRE_COOLDOWN * 0.35) : FIRE_COOLDOWN
+    };
+  }
+  function throwFire(dx, dy) {
+    var now = performance.now();
+    var stats = currentFireStats();
+    if (!joined || now - lastFireAt < stats.cooldown) return;
+    var len = Math.hypot(dx, dy);
+    if (!len) { dx = me.facing.x; dy = me.facing.y; len = Math.hypot(dx, dy) || 1; }
+    dx /= len; dy /= len;
+    lastFireAt = now;
+    for (var i = 0; i < stats.shots; i++) {
+      var ang = stats.shots === 3 ? (i - 1) * FIRE_SPREAD : 0;
+      var c = Math.cos(ang), s = Math.sin(ang);
+      var ddx = dx * c - dy * s, ddy = dx * s + dy * c;
+      fires.push({
+        x: me.x, y: me.y, dx: ddx, dy: ddy, born: now, ownerKey: "me", hitAt: null,
+        scale: stats.sizeMult, speedMult: stats.speedMult / curScale(), bounce: stats.bounce, life: stats.life,
+        pierce: stats.pierce, hitTargets: stats.pierce ? new Set() : null,
+        pierceSparks: stats.pierce ? [] : null, reported: false
+      });
+    }
+    if (wsOpen && joinedOnServer) send({ t: "fire", dx: dx, dy: dy });
+  }
+
+  // ---------- chat log ----------
+  function addLine(cls, who, text) {
+    var near = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
+    var d = document.createElement("div");
+    d.className = cls;
+    if (who) { var w = document.createElement("span"); w.className = "who"; w.textContent = who + ":"; d.appendChild(w); }
+    d.appendChild(document.createTextNode(text));
+    logEl.appendChild(d);
+    while (logEl.children.length > 200) logEl.removeChild(logEl.firstChild);
+    if (near) logEl.scrollTop = logEl.scrollHeight;
+  }
+  function addChat(name, text, self) { addLine("msg" + (self ? " self" : ""), name, text); }
+  function addSys(text) { addLine("sys", null, text); }
+  function say(key, text) { bubbles.set(key, { text: text, until: performance.now() + 5500 }); }
+
+  function sendChat() {
+    var t = clean(chatInput.value, 120);
+    if (!t || !joined) return;
+    var now = performance.now();
+    if (now - lastChatAt < 400) return;
+    lastChatAt = now;
+    chatInput.value = "";
+    function local() { addChat(me.name, t, true); say("me", t); }
+    if (wsOpen && joinedOnServer) { send({ t: "chat", text: t }); } else { local(); }
+  }
+
+  // ---------- network (WebSocket) ----------
+  var ws = null, wsOpen = false, joinedOnServer = false, myId = null;
+  var remote = new Map();   // id -> {id, name, hue, x, y, tx, ty}
+  var reconnectDelay = 1000, lastPosAt = 0, lastSent = "", password = "";
+  var pwEl = document.getElementById("pw"), errEl = document.getElementById("err");
+  var chestBtn = document.getElementById("chestBtn"), hatToast = document.getElementById("hatToast");
+  var powerChestBtn = document.getElementById("powerChestBtn"), powerupBadge = document.getElementById("powerupBadge");
+  var toastTimer = null;
+
+  var clientId = "";
+  try { clientId = localStorage.getItem("slime_client_id") || ""; } catch (e) {}
+  if (!clientId) {
+    clientId = Math.random().toString(16).slice(2) + Date.now().toString(16);
+    try { localStorage.setItem("slime_client_id", clientId); } catch (e) {}
+  }
+
+  function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+  function sendJoin() { send({ t: "join", name: me.name, hue: me.hue, password: password, x: Math.round(me.x), y: Math.round(me.y), clientId: clientId }); }
+
+  function showToast(text) {
+    hatToast.textContent = text;
+    hatToast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { hatToast.classList.remove("show"); }, 3200);
+  }
+  function announceHat(who, hat, isSelf) {
+    var meta = HATS_META[hat];
+    if (!meta) return;
+    var emoji = RARITY_EMOJI[meta.rarity] || "🎁";
+    var label = meta.rarity.charAt(0).toUpperCase() + meta.rarity.slice(1);
+    if (isSelf) {
+      addSys(emoji + " You obtained a " + label + " " + meta.name + "!");
+      showToast(emoji + " " + label + " — " + meta.name + "!");
+    } else {
+      addSys(emoji + " " + who + " obtained a " + label + " " + meta.name + "!");
+    }
+  }
+  function renderBoard(list) {
+    if (!Array.isArray(list) || !list.length) { boardEl.style.display = "none"; boardEl.textContent = ""; return; }
+    for (var q = 0; q < list.length; q++) { if (list[q].id === myId && isNum(list[q].hits)) myHits = list[q].hits; }
+    var sorted = list.slice().sort(function (a, b) { return b.hits - a.hits; });
+    boardEl.textContent = "";
+    for (var i = 0; i < sorted.length; i++) {
+      var e = sorted[i];
+      var chip = document.createElement("div");
+      chip.className = "chip";
+      var nm = document.createElement("span");
+      nm.textContent = clean(e.name || "Someone", 14) + (e.id === myId ? " (you)" : "");
+      var n = document.createElement("span");
+      n.className = "n"; n.textContent = "🔥 " + (isNum(e.hits) ? e.hits : 0);
+      chip.appendChild(nm); chip.appendChild(n);
+      boardEl.appendChild(chip);
+    }
+    boardEl.style.display = "flex";
+  }
+
+  function pushPresence(force) {
+    if (!joinedOnServer) return;
+    var x = Math.round(me.x), y = Math.round(me.y), s2 = x + "," + y, now = performance.now();
+    if (s2 === lastSent || (!force && now - lastPosAt < 66)) return;
+    lastSent = s2; lastPosAt = now;
+    send({ t: "pos", x: x, y: y });
+  }
+
+  function updateStatus() {
+    if (wsOpen) {
+      dot.className = "dot live";
+      statusText.textContent = joinedOnServer ? "Live · " + (remote.size + 1) + (myRoom === "boss" ? " in boss room" : " in lounge") : "Connected";
+    } else {
+      dot.className = "dot";
+      statusText.textContent = "Offline · solo mode";
+    }
+  }
+
+  function addPeer(p) {
+    if (!p || typeof p.id !== "string" || !isNum(p.x) || !isNum(p.y)) return false;
+    var hue = isNum(p.hue) ? ((p.hue % 360) + 360) % 360 : 120;
+    var x = clamp(p.x, curBounds().x0, curBounds().x1), y = clamp(p.y, curBounds().y0, curBounds().y1);
+    remote.set(p.id, { id: p.id, name: clean(p.name || "", 14) || "Someone", hue: hue, x: x, y: y, tx: x, ty: y, hat: (typeof p.hat === "string" && HATS_META[p.hat]) ? p.hat : null });
+    return true;
+  }
+
+  function handle(m) {
+    if (!m || typeof m.t !== "string") return;
+    var r;
+    if (m.t === "hello") {
+      pwEl.style.display = m.needsPassword ? "block" : "none";
+    } else if (m.t === "welcome") {
+      myId = m.id; joinedOnServer = true; remote.clear();
+      me.hat = (typeof m.yourHat === "string" && HATS_META[m.yourHat]) ? m.yourHat : null;
+      myHits = isNum(m.yourHits) ? m.yourHits : 0;
+      myPowerupClaims = isNum(m.yourPowerupClaims) ? m.yourPowerupClaims : 0;
+      activePowerup = null; powerupBadge.style.display = "none";
+      myRoom = "lounge";
+      swordHolderId = typeof m.swordHolderId === "string" ? m.swordHolderId : null;
+      bossHP = isNum(m.bossHP) ? m.bossHP : BOSS_MAX_HP;
+      bossAlive = m.bossAlive !== false;
+      (Array.isArray(m.peers) ? m.peers : []).forEach(addPeer);
+      if (!joined) {
+        joined = true; overlay.classList.add("hidden");
+        addSys("Welcome, " + me.name + "! Click the floor to move around.");
+      }
+      renderBoard(m.board);
+      lastSent = ""; pushPresence(true); updateStatus();
+    } else if (m.t === "denied") {
+      joinedOnServer = false; joined = false;
+      errEl.textContent = m.reason === "password" ? "Wrong password." : m.reason === "full" ? "The lounge is full." : "Could not join.";
+      overlay.classList.remove("hidden");
+    } else if (m.t === "joined") {
+      if (addPeer(m.peer)) { addSys(remote.get(m.peer.id).name + (myRoom === "boss" ? " entered the boss chamber." : " entered the lounge.")); updateStatus(); }
+    } else if (m.t === "state" && Array.isArray(m.p)) {
+      for (var i = 0; i < m.p.length; i++) {
+        var e = m.p[i];
+        if (!Array.isArray(e)) continue;
+        r = remote.get(e[0]);
+        if (r && isNum(e[1]) && isNum(e[2])) { r.tx = clamp(e[1], curBounds().x0, curBounds().x1); r.ty = clamp(e[2], curBounds().y0, curBounds().y1); }
+      }
+    } else if (m.t === "left") {
+      r = remote.get(m.id);
+      if (r) { addSys(r.name + " left."); remote.delete(m.id); bubbles.delete(m.id); updateStatus(); }
+    } else if (m.t === "chat" && typeof m.text === "string") {
+      var text = clean(m.text, 120);
+      if (!text) return;
+      var self = m.id === myId;
+      addChat(self ? me.name : (clean(m.name || "", 14) || "Someone"), text, self);
+      say(self ? "me" : m.id, text);
+    } else if (m.t === "hat" && typeof m.id === "string") {
+      r = remote.get(m.id);
+      if (r && typeof m.hat === "string" && HATS_META[m.hat]) { r.hat = m.hat; announceHat(r.name, m.hat, false); }
+    } else if (m.t === "hatResult" && typeof m.hat === "string" && HATS_META[m.hat]) {
+      var hadNoHat = !me.hat;
+      me.hat = m.hat;
+      if (!m.already && hadNoHat) announceHat(me.name, m.hat, true);
+    } else if (m.t === "fire" && typeof m.id === "string" && isNum(m.x) && isNum(m.y) && isNum(m.dx) && isNum(m.dy)) {
+      if (m.id === myId) return;
+      var flen = Math.hypot(m.dx, m.dy) || 1;
+      var fpierce = !!m.pierce;
+      fires.push({
+        x: m.x, y: m.y, dx: m.dx / flen, dy: m.dy / flen, born: performance.now(), ownerKey: m.id, hitAt: null,
+        scale: isNum(m.sizeMult) ? m.sizeMult : 1, speedMult: (isNum(m.speedMult) ? m.speedMult : 1) / curScale(),
+        bounce: !!m.bounce, life: isNum(m.life) ? m.life : FIRE_LIFE,
+        pierce: fpierce, hitTargets: fpierce ? new Set() : null, pierceSparks: fpierce ? [] : null, reported: false
+      });
+    } else if (m.t === "board" && Array.isArray(m.list)) {
+      renderBoard(m.list);
+    } else if (m.t === "powerchestResult") {
+      if (m.ok && typeof m.id === "string") {
+        myPowerupClaims = isNum(m.claims) ? m.claims : myPowerupClaims + 1;
+        activePowerup = { id: m.id, name: m.name || m.id, desc: m.desc || "", expiresAt: isNum(m.expiresAt) ? m.expiresAt : Date.now() + 10000 };
+        var puEmoji = POWERUP_EMOJI[m.id] || "✨";
+        addSys(puEmoji + " You activated " + activePowerup.name + "! " + activePowerup.desc);
+        showToast(puEmoji + " " + activePowerup.name + "!");
+      } else if (!m.ok) {
+        var need = Math.max(0, (isNum(m.nextAt) ? m.nextAt : 0) - (isNum(m.hits) ? m.hits : myHits));
+        addSys("🔒 The power chest needs " + need + " more fire hit" + (need === 1 ? "" : "s") + " on the leaderboard.");
+      }
+    } else if (m.t === "powerupGrant" && typeof m.id === "string") {
+      if (m.id !== myId) addSys("⚡ " + (clean(m.name || "", 14) || "Someone") + " activated " + (m.puName || "a power-up") + "!");
+    } else if (m.t === "death" && typeof m.id === "string" && isNum(m.x) && isNum(m.y)) {
+      if (m.id === myId) {
+        me.x = m.x; me.y = m.y; me.tx = null; me.ty = null; me.moving = false;
+        addSys("i died");
+        showToast("💀 i died");
+        lastSent = ""; pushPresence(true);
+      } else {
+        r = remote.get(m.id);
+        if (r) { r.x = m.x; r.y = m.y; r.tx = m.x; r.ty = m.y; addSys(r.name + " died and returned to the center."); }
+      }
+    } else if (m.t === "roomChanged" && typeof m.room === "string") {
+      myRoom = m.room;
+      remote.clear(); bubbles.clear(); fires.length = 0;
+      if (isNum(m.x)) me.x = m.x; if (isNum(m.y)) me.y = m.y;
+      me.tx = null; me.ty = null; me.moving = false;
+      swordHolderId = typeof m.swordHolderId === "string" ? m.swordHolderId : null;
+      bossHP = isNum(m.bossHP) ? m.bossHP : bossHP;
+      bossAlive = m.bossAlive !== false;
+      (Array.isArray(m.peers) ? m.peers : []).forEach(addPeer);
+      if (m.reason === "boss") {
+        addSys("💥 The big slime smashed you back to the lounge!");
+        showToast("💥 knocked back!");
+      } else if (m.reason === "died") {
+        addSys("💀 You died and were sent back to the lounge!");
+        showToast("💀 i died");
+      } else {
+        addSys(myRoom === "boss" ? "You step through the door into the boss chamber!" : "You slip back into the lounge.");
+      }
+      lastSent = ""; pushPresence(true); updateStatus();
+    } else if (m.t === "bossFire" && isNum(m.x) && isNum(m.y) && isNum(m.dx) && isNum(m.dy)) {
+      if (myRoom !== "boss") return;
+      fires.push({
+        x: m.x, y: m.y, dx: m.dx, dy: m.dy, born: performance.now(), ownerKey: "boss", hitAt: null,
+        scale: 1.3, speedMult: 1 / curScale(), bounce: false, life: 1500, pierce: false, boss: true, reported: false
+      });
+    } else if (m.t === "sword") {
+      swordHolderId = typeof m.holderId === "string" ? m.holderId : null;
+    } else if (m.t === "bossHP" && isNum(m.hp)) {
+      bossHP = m.hp;
+    } else if (m.t === "bossDefeated") {
+      bossAlive = false; bossHP = 0;
+      addSys("🏆 The big slime has been defeated!");
+      showToast("🏆 Boss defeated!");
+    }
+  }
+
+  function retry() { setTimeout(connect, reconnectDelay); reconnectDelay = Math.min(reconnectDelay * 1.7, 15000); }
+  function connect() {
+    if (!/^https?:$/.test(location.protocol)) { updateStatus(); return; }   // opened as a local file: solo mode
+    try { ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws"); }
+    catch (e) { retry(); return; }
+    ws.onopen = function () { wsOpen = true; reconnectDelay = 1000; if (joined) sendJoin(); updateStatus(); };
+    ws.onmessage = function (ev) { var m; try { m = JSON.parse(ev.data); } catch (e) { return; } handle(m); };
+    ws.onclose = function () { wsOpen = false; joinedOnServer = false; remote.clear(); renderBoard(null); updateStatus(); retry(); };
+    ws.onerror = function () {};
+  }
+
+  // ---------- update / render ----------
+  function update(dt) {
+    if (activePowerup && Date.now() > activePowerup.expiresAt) {
+      addSys((POWERUP_EMOJI[activePowerup.id] || "✨") + " Your " + activePowerup.name + " wore off.");
+      activePowerup = null;
+    }
+    var effSpeed = SPEED / curScale() * (activePowerup && activePowerup.id === "haste" ? 1.4 : 1);
+
+    if (joined && document.activeElement !== chatInput) {
+      var vx = (keys.ArrowRight || keys.d ? 1 : 0) - (keys.ArrowLeft || keys.a ? 1 : 0);
+      var vy = (keys.ArrowDown || keys.s ? 1 : 0) - (keys.ArrowUp || keys.w ? 1 : 0);
+      if (vx || vy) {
+        me.tx = null; me.ty = null;
+        var len = Math.hypot(vx, vy);
+        me.x += vx / len * effSpeed * dt; me.y += vy / len * effSpeed * dt;
+        me.moving = true;
+        me.facing = { x: vx / len, y: vy / len };
+      } else me.moving = false;
+    } else me.moving = false;
+
+    if (me.tx !== null && joined) {
+      var dx = me.tx - me.x, dy = me.ty - me.y, dist = Math.hypot(dx, dy);
+      if (dist < 3) { me.tx = null; me.ty = null; me.moving = false; }
+      else {
+        var step = Math.min(effSpeed * dt, dist);
+        me.x += dx / dist * step; me.y += dy / dist * step; me.moving = true;
+        me.facing = { x: dx / dist, y: dy / dist };
+      }
+    }
+    me.x = clamp(me.x, curBounds().x0, curBounds().x1);
+    me.y = clamp(me.y, curBounds().y0, curBounds().y1);
+    pushPresence(false);
+
+    var nearChest = myRoom === "lounge" && joined && !me.hat && Math.hypot(me.x - CHEST.x, me.y - CHEST.y) < CHEST.r;
+    chestBtn.style.display = nearChest ? "block" : "none";
+
+    var nearPower = myRoom === "lounge" && joined && Math.hypot(me.x - POWER_CHEST.x, me.y - POWER_CHEST.y) < POWER_CHEST.r;
+    if (nearPower) {
+      var nextAt = (myPowerupClaims + 1) * 10;
+      if (myHits >= nextAt) { powerChestBtn.textContent = "✨ Open power chest"; }
+      else { var need = nextAt - myHits; powerChestBtn.textContent = "🔒 " + need + " more hit" + (need === 1 ? "" : "s"); }
+      powerChestBtn.style.display = "block";
+    } else {
+      powerChestBtn.style.display = "none";
+    }
+
+    if (activePowerup) {
+      var remain = Math.max(0, (activePowerup.expiresAt - Date.now()) / 1000);
+      powerupBadge.textContent = (POWERUP_EMOJI[activePowerup.id] || "✨") + " " + activePowerup.name + " · " + remain.toFixed(1) + "s";
+      powerupBadge.style.display = "block";
+    } else {
+      powerupBadge.style.display = "none";
+    }
+  }
+
+  function render(t, now) {
+    var scale = curScale();
+    ctx.save();
+    ctx.scale(scale, scale);
+    ctx.drawImage(myRoom === "boss" ? floorBoss : floorLounge, 0, 0);
+    var actors = [], i;
+    if (joined) actors.push({ key: "me", x: me.x, y: me.y, hue: me.hue, name: me.name, moving: me.moving, phase: 0, self: true, hat: me.hat, scale: 1 });
+    var k = 1 - Math.exp(-0.25 * 60 * 0.016);
+    remote.forEach(function (r) {
+      r.x += (r.tx - r.x) * k; r.y += (r.ty - r.y) * k;
+      actors.push({ key: r.id, x: r.x, y: r.y, hue: r.hue, name: r.name, moving: Math.hypot(r.tx - r.x, r.ty - r.y) > 2, phase: hashPhase(r.id), self: false, hat: r.hat, scale: 1 });
+    });
+    if (myRoom === "boss") {
+      actors.push({
+        key: "boss", x: BOSS_POS.x, y: BOSS_POS.y,
+        name: bossAlive ? "The Big Slime" : "Defeated Slime",
+        moving: false, phase: 0, self: false, hat: null, boss: true
+      });
+    }
+    // click marker
+    if (joined && me.tx !== null) {
+      var pulse = 6 + Math.sin(t * 8) * 2;
+      ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(me.tx, me.ty, pulse + 4, (pulse + 4) * 0.45, 0, 0, Math.PI * 2); ctx.stroke();
+    }
+    actors.sort(function (a, b) { return a.y - b.y; });
+    for (i = 0; i < actors.length; i++) { if (actors[i].boss) drawBoss(actors[i].x, actors[i].y, t); else drawSlime(actors[i], t); }
+    for (i = 0; i < actors.length; i++) drawHat(actors[i], t);
+    for (i = 0; i < actors.length; i++) drawSword(actors[i]);
+    for (i = 0; i < actors.length; i++) drawName(actors[i]);
+    for (i = 0; i < actors.length; i++) {
+      var b = bubbles.get(actors[i].key);
+      if (b) { if (now > b.until) bubbles.delete(actors[i].key); else drawBubble(actors[i], b, now); }
+    }
+    if (myRoom === "boss" && !swordHolderId) drawRestingSword(now);
+    stepAndDrawFires(now, actors);
+    ctx.restore();
+    if (myRoom === "boss" && bossAlive) drawBossHP();
+  }
+
+  var last = performance.now();
+  function frame(now) {
+    var dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt);
+    render(now / 1000, now);
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- input ----------
+  var lastTapAt = 0, lastTapX = 0, lastTapY = 0;
+  cv.addEventListener("pointerdown", function (e) {
+    if (!joined) return;
+    var r = cv.getBoundingClientRect();
+    var scl = curScale();
+    var px = clamp((e.clientX - r.left) / r.width * W / scl, curBounds().x0, curBounds().x1);
+    var py = clamp((e.clientY - r.top) / r.height * W / scl, curBounds().y0, curBounds().y1);
+    var now = performance.now();
+    var isDouble = now - lastTapAt < 320 && Math.hypot(px - lastTapX, py - lastTapY) < 60;
+    lastTapAt = now; lastTapX = px; lastTapY = py;
+    if (isDouble) {
+      lastTapAt = 0;
+      var ddx = px - me.x, ddy = py - me.y;
+      var dlen = Math.hypot(ddx, ddy) || 1;
+      throwFire(ddx / dlen, ddy / dlen);
+    } else {
+      me.tx = px; me.ty = py;
+    }
+  });
+  window.addEventListener("keydown", function (e) {
+    var tag = document.activeElement && document.activeElement.tagName;
+    if (tag === "INPUT") return;
+    if (e.key === "Enter" && joined) { e.preventDefault(); chatInput.focus(); return; }
+    var key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (key === "e") {
+      if (chestBtn.style.display === "block") { openChest(); return; }
+      if (powerChestBtn.style.display === "block") { openPowerChest(); return; }
+    }
+    if (key === "f") { e.preventDefault(); throwFire(me.facing.x, me.facing.y); return; }
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(key) >= 0) e.preventDefault();
+    keys[key] = true;
+  });
+  window.addEventListener("keyup", function (e) {
+    var key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    keys[key] = false;
+  });
+  window.addEventListener("blur", function () { keys = {}; });
+  chatInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); sendChat(); }
+    else if (e.key === "Escape") chatInput.blur();
+  });
+  document.getElementById("sendBtn").addEventListener("click", sendChat);
+
+  function openChest() {
+    if (!joined || me.hat) return;
+    if (wsOpen && joinedOnServer) { send({ t: "chest" }); }
+    else { addSys("Connect to the server to open the chest."); }
+  }
+  chestBtn.addEventListener("click", openChest);
+
+  function openPowerChest() {
+    if (!joined) return;
+    if (wsOpen && joinedOnServer) { send({ t: "powerchest" }); }
+    else { addSys("Connect to the server to open the power chest."); }
+  }
+  powerChestBtn.addEventListener("click", openPowerChest);
+
+  // ---------- join screen ----------
+  var storedName = "", storedHue = null;
+  try {
+    storedName = localStorage.getItem("slime_name") || "";
+    var h = parseInt(localStorage.getItem("slime_hue"), 10);
+    if (isFinite(h)) storedHue = h;
+  } catch (e) {}
+  me.hue = storedHue !== null && HUES.indexOf(storedHue) >= 0 ? storedHue : HUES[Math.floor(Math.random() * HUES.length)];
+  nickEl.value = clean(storedName, 14) || "Slime" + (100 + Math.floor(Math.random() * 900));
+
+  function renderSwatches() {
+    swEl.textContent = "";
+    HUES.forEach(function (h) {
+      var b = document.createElement("button");
+      b.className = "sw" + (h === me.hue ? " on" : "");
+      b.style.background = "hsl(" + h + ",70%,64%)";
+      b.setAttribute("aria-label", "Slime colour " + h);
+      b.addEventListener("click", function () { me.hue = h; renderSwatches(); });
+      swEl.appendChild(b);
+    });
+  }
+  renderSwatches();
+
+  function join() {
+    me.name = clean(nickEl.value, 14) || "Slime";
+    password = pwEl.value;
+    errEl.textContent = "";
+    try { localStorage.setItem("slime_name", me.name); localStorage.setItem("slime_hue", String(me.hue)); } catch (e) {}
+    if (wsOpen) { sendJoin(); return; }   // wait for the server's welcome
+    joined = true;
+    overlay.classList.add("hidden");
+    addSys("Welcome, " + me.name + "! The server is unreachable, so you're in solo mode.");
+    updateStatus();
+  }
+  document.getElementById("joinBtn").addEventListener("click", join);
+  nickEl.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); join(); } });
+
+  // ---------- go ----------
+  updateStatus();
+  connect();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
